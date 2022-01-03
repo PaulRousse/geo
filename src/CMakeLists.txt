@@ -1,0 +1,9 @@
+add_library(geom_computation_lib geom_computation.cpp)
+
+target_link_libraries(geom_computation_lib Geographic)
+
+target_include_directories(geom_computation_lib PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+
+
+add_library(geom_computation_static_lib OBJECT geom_computation.cpp )
+target_link_libraries(geom_computation_static_lib Geographic)

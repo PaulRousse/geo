@@ -1,0 +1,83 @@
+import parse_c_header
+import sys
+
+module_name = sys.argv[1]
+header_filename = sys.argv[2]
+header_clean_filename = sys.argv[3]
+
+functions = parse_c_header.parse_header(header_clean_filename)
+
+type_signature = {"double":"d", "int":"i"}
+
+./*  Example of wrapping cos function from math.h with the Python-C-API. */
+.#include <Python.h>
+.#include "@{header_filename}"
+
+for func in functions:
+    .
+    .static PyObject* py_@{func['name']}(PyObject* self, PyObject* args)
+    .{
+
+    arg_in = func['input_args']
+    arg_out = func['output_args']
+    input_signature = ""
+    inputs_names = [a['name'] for a in arg_in]
+    vargs_inputs = ", ".join([a['name'] for a in arg_in])
+    vargs_inputs_ref = ", ".join(["&"+a['name'] for a in arg_in])
+    output_signature = ""
+    vargs_outputs = ", ".join([a['name'] for a in arg_out])
+    vargs_outputs_ref = ", ".join(["&"+a['name'] for a in arg_out])
+    for arg_in in func['input_args']:
+        .    @{arg_in['type']} @{arg_in['name']};
+        input_signature += type_signature[arg_in['type']]
+    for arg_out in func['output_args']:
+        .    @{arg_out['type']} @{arg_out['name']};
+        output_signature += type_signature[arg_out['type']]
+
+        
+    .
+    .    /*  parse the input, from python float to c double */
+    .    if (!PyArg_ParseTuple(args, "@{input_signature}", @{vargs_inputs_ref}))
+    .        return NULL;
+    .
+    .    @{func['name']}(@{vargs_inputs},@{vargs_outputs_ref});
+    .
+    .    return Py_BuildValue("@{output_signature}", @{vargs_outputs});
+    .}
+    .
+./*  define functions in module */
+.static PyMethodDef WrapperMethods[] =
+.{
+for func in functions:
+    .     {"@{func['name']}", py_@{func['name']}, METH_VARARGS, "@{func['name']}"},
+.     {NULL, NULL, 0, NULL}
+.};
+.
+.#if PY_MAJOR_VERSION >= 3
+./* module initialization */
+./* Python version 3*/
+.static struct PyModuleDef cModPyDem =
+.{
+.    PyModuleDef_HEAD_INIT,
+.    "c_wrapper", "wrapper c code",
+.    -1,
+.    WrapperMethods
+.};
+.
+.PyMODINIT_FUNC
+.PyInit_@{module_name}(void)
+.{
+.    return PyModule_Create(&cModPyDem);
+.}
+.
+.#else
+.
+./* module initialization */
+./* Python version 2 */
+.PyMODINIT_FUNC
+.init@{module_name}(void)
+.{
+.    (void) Py_InitModule("@{module_name}", WrapperMethods);
+.}
+.
+.#endif
